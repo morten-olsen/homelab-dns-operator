@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "dns-operator.fullname" . }}-rolebinding
+  labels:
+    {{- include "dns-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "dns-operator.fullname" . }}-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "dns-operator.serviceAccountName" . }}
+  namespace: {{ include "dns-operator.namespace" . }}

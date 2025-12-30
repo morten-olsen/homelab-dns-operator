@@ -1,0 +1,19 @@
+apiVersion: v2
+name: dns-operator
+description: A Helm chart for DNS Operator - A Kubernetes operator for declarative DNS management
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - dns
+  - operator
+  - kubernetes
+  - kubebuilder
+home: https://github.com/mortenolsen/dns-operator
+sources:
+  - https://github.com/mortenolsen/dns-operator
+maintainers:
+  - name: DNS Operator Maintainers
+kubeVersion: ">=1.11.3"
+annotations:
+  category: Operator

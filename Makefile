@@ -162,6 +162,13 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -; else echo "No CRDs to delete; skipping."; fi
 
+.PHONY: update-crds
+update-crds: manifests ## Update CRDs in the Helm chart from the application.
+	@echo "Updating CRDs in Helm chart..."
+	@mkdir -p charts/dns-operator/crds
+	@cp config/crd/bases/*.yaml charts/dns-operator/crds/ || true
+	@echo "CRDs updated in charts/dns-operator/crds/"
+
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}

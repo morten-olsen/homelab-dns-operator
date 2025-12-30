@@ -1,0 +1,122 @@
+# Default values for dns-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Image configuration
+image:
+  repository: controller
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Name override for the deployment and other resources
+nameOverride: ""
+fullnameOverride: ""
+
+# Namespace to deploy the operator
+namespace:
+  create: true
+  name: dns-operator-system
+
+# Replica count for the controller manager
+replicaCount: 1
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container security context
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - "ALL"
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Leader election configuration
+leaderElection:
+  enabled: true
+
+# Health probe configuration
+healthProbe:
+  bindAddress: ":8081"
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+# Metrics configuration
+metrics:
+  enabled: true
+  service:
+    create: true
+    port: 8443
+    targetPort: 8443
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+
+# Webhook configuration
+webhook:
+  enabled: true
+  service:
+    create: true
+    port: 443
+    targetPort: 9443
+  failurePolicy: Fail
+  certManager:
+    enabled: true
+    issuer:
+      name: ""
+      kind: ""
+
+# Environment variables for operator configuration
+env:
+  # DNSClass health check interval (default: 10m)
+  DNS_CLASS_HEALTH_CHECK_INTERVAL: "10m"
+  # DNSRecord retry base delay (default: 5s)
+  DNS_RECORD_RETRY_BASE_DELAY: "5s"
+  # DNSRecord retry max delay (default: 60s)
+  DNS_RECORD_RETRY_MAX_DELAY: "60s"
+  # DNSRecord retry max attempts (default: 5)
+  DNS_RECORD_RETRY_MAX_ATTEMPTS: "5"
+
+# Additional environment variables
+extraEnv: []
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod labels
+podLabels: {}
+
+# Termination grace period
+terminationGracePeriodSeconds: 10

@@ -1,0 +1,23 @@
+{{- if .Values.webhook.enabled }}
+{{- if .Values.webhook.certManager.enabled }}
+{{- if .Values.webhook.certManager.issuer.name }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "dns-operator.fullname" . }}-webhook-server-cert
+  namespace: {{ include "dns-operator.namespace" . }}
+  labels:
+    {{- include "dns-operator.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+  - {{ include "dns-operator.webhookServiceName" . }}
+  - {{ printf "%s.%s" (include "dns-operator.webhookServiceName" .) (include "dns-operator.namespace" .) }}
+  - {{ printf "%s.%s.svc" (include "dns-operator.webhookServiceName" .) (include "dns-operator.namespace" .) }}
+  - {{ printf "%s.%s.svc.cluster.local" (include "dns-operator.webhookServiceName" .) (include "dns-operator.namespace" .) }}
+  issuerRef:
+    name: {{ .Values.webhook.certManager.issuer.name }}
+    kind: {{ default "Issuer" .Values.webhook.certManager.issuer.kind }}
+  secretName: {{ include "dns-operator.fullname" . }}-webhook-server-cert
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dns-operator.fullname" . }}-controller-manager
+  namespace: {{ include "dns-operator.namespace" . }}
+  labels:
+    {{- include "dns-operator.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "dns-operator.selectorLabels" . | nindent 6 }}
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "dns-operator.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      serviceAccountName: {{ include "dns-operator.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+      - command:
+        - /manager
+        args:
+        {{- if .Values.leaderElection.enabled }}
+        - --leader-elect
+        {{- end }}
+        - --health-probe-bind-address={{ .Values.healthProbe.bindAddress }}
+        {{- if .Values.metrics.enabled }}
+        - --metrics-bind-address=:8443
+        {{- end }}
+        {{- if .Values.webhook.enabled }}
+        - --webhook-cert-dir=/tmp/k8s-webhook-server/serving-certs
+        {{- end }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        name: manager
+        ports: []
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: {{ .Values.healthProbe.liveness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthProbe.liveness.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: {{ .Values.healthProbe.readiness.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthProbe.readiness.periodSeconds }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        env:
+        - name: DNS_CLASS_HEALTH_CHECK_INTERVAL
+          value: {{ .Values.env.DNS_CLASS_HEALTH_CHECK_INTERVAL | quote }}
+        - name: DNS_RECORD_RETRY_BASE_DELAY
+          value: {{ .Values.env.DNS_RECORD_RETRY_BASE_DELAY | quote }}
+        - name: DNS_RECORD_RETRY_MAX_DELAY
+          value: {{ .Values.env.DNS_RECORD_RETRY_MAX_DELAY | quote }}
+        - name: DNS_RECORD_RETRY_MAX_ATTEMPTS
+          value: {{ .Values.env.DNS_RECORD_RETRY_MAX_ATTEMPTS | quote }}
+        {{- with .Values.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.webhook.enabled }}
+        volumeMounts:
+        - name: cert
+          readOnly: true
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.webhook.enabled }}
+      volumes:
+      - name: cert
+        secret:
+          secretName: {{ include "dns-operator.fullname" . }}-webhook-server-cert
+      {{- end }}

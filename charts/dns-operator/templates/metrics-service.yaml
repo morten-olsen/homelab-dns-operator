@@ -1,0 +1,20 @@
+{{- if .Values.metrics.enabled }}
+{{- if .Values.metrics.service.create }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dns-operator.fullname" . }}-metrics-service
+  namespace: {{ include "dns-operator.namespace" . }}
+  labels:
+    {{- include "dns-operator.labels" . | nindent 4 }}
+    control-plane: controller-manager
+spec:
+  ports:
+  - name: https
+    port: {{ .Values.metrics.service.port }}
+    protocol: TCP
+    targetPort: {{ .Values.metrics.service.targetPort }}
+  selector:
+    {{- include "dns-operator.selectorLabels" . | nindent 4 }}
+{{- end }}
+{{- end }}

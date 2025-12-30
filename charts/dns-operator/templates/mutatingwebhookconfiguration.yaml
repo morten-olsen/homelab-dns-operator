@@ -1,0 +1,58 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ include "dns-operator.fullname" . }}-mutating-webhook-configuration
+  labels:
+    {{- include "dns-operator.labels" . | nindent 4 }}
+  {{- if .Values.webhook.certManager.enabled }}
+  {{- if .Values.webhook.certManager.issuer.name }}
+  {{- $certNamespace := include "dns-operator.namespace" . }}
+  {{- $certName := printf "%s-webhook-server-cert" (include "dns-operator.fullname" .) }}
+  {{- $certRef := printf "%s/%s" $certNamespace $certName }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ $certRef }}
+  {{- end }}
+  {{- end }}
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "dns-operator.webhookServiceName" . }}
+      namespace: {{ include "dns-operator.namespace" . }}
+      path: /mutate-dns-homelab-mortenolsen-pro-v1alpha1-dnsclass
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  name: mdnsclass-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - dns.homelab.mortenolsen.pro
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dnsclasses
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ include "dns-operator.webhookServiceName" . }}
+      namespace: {{ include "dns-operator.namespace" . }}
+      path: /mutate-dns-homelab-mortenolsen-pro-v1alpha1-dnsrecord
+  failurePolicy: {{ .Values.webhook.failurePolicy }}
+  name: mdnsrecord-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - dns.homelab.mortenolsen.pro
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dnsrecords
+  sideEffects: None
+{{- end }}
