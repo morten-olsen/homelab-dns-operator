@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"context"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,10 +26,8 @@ import (
 	dnsv1alpha1 "github.com/mortenolsen/dns-operator/api/v1alpha1"
 )
 
-func TestDNSRecordWebhook(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "DNSRecord Webhook Suite")
-}
+// Note: Ginkgo suite tests are in webhook_suite_test.go
+// This file contains additional validation tests using Ginkgo
 
 var _ = Describe("DNSRecord Webhook Validation", func() {
 	var validator *DNSRecordCustomValidator

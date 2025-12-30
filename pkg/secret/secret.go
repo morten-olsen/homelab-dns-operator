@@ -28,8 +28,12 @@ import (
 	"github.com/mortenolsen/dns-operator/pkg/hmac"
 )
 
-// GetHMACSecret retrieves the HMAC secret from either a Kubernetes Secret or direct value
-func GetHMACSecret(ctx context.Context, k8sClient client.Client, hmacAuth *dnsv1alpha1.HMACAuth) ([]byte, hmac.Algorithm, error) {
+// GetHMACSecret retrieves the HMAC secret from either a Kubernetes Secret or direct value.
+func GetHMACSecret(
+	ctx context.Context,
+	k8sClient client.Client,
+	hmacAuth *dnsv1alpha1.HMACAuth,
+) ([]byte, hmac.Algorithm, error) {
 	if hmacAuth == nil {
 		return nil, "", nil
 	}

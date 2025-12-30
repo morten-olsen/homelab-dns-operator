@@ -149,10 +149,10 @@ func TestValidateDNSRecord(t *testing.T) {
 
 func TestValidateDNSClass(t *testing.T) {
 	tests := []struct {
-		name    string
+		name     string
 		dnsclass *dnsv1alpha1.DNSClass
-		wantErr bool
-		errMsg  string
+		wantErr  bool
+		errMsg   string
 	}{
 		{
 			name: "valid DNSClass",
@@ -207,8 +207,8 @@ func TestValidateDNSClass(t *testing.T) {
 				Spec: dnsv1alpha1.DNSClassSpec{
 					Server: "http://example.com:7100",
 					HMACAuth: &dnsv1alpha1.HMACAuth{
-						Secret:     stringPtr("test-secret"),
-						Algorithm:  "INVALID",
+						Secret:    stringPtr("test-secret"),
+						Algorithm: "INVALID",
 					},
 				},
 			},

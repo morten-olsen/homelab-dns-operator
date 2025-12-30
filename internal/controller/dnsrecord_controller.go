@@ -97,7 +97,7 @@ func (r *DNSRecordReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err := r.Get(ctx, types.NamespacedName{Name: dnsRecord.Spec.DNSClassRef.Name}, dnsClass); err != nil {
 		log.Error(err, "failed to get DNSClass")
 		fqdn := r.buildFQDN(dnsRecord.Spec.Domain, dnsRecord.Spec.Subdomain)
-		r.updateStatusWithError(ctx, dnsRecord, false, "DNSClassNotFound", fmt.Sprintf("DNSClass %s not found: %v", dnsRecord.Spec.DNSClassRef.Name, err), "DNS_CLASS_NOT_FOUND", err.Error(), fqdn)
+		r.updateStatusWithError(ctx, dnsRecord, "DNSClassNotFound", fmt.Sprintf("DNSClass %s not found: %v", dnsRecord.Spec.DNSClassRef.Name, err), "DNS_CLASS_NOT_FOUND", err.Error(), fqdn)
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
 
@@ -106,7 +106,7 @@ func (r *DNSRecordReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		log.Error(err, "failed to get HMAC secret")
 		fqdn := r.buildFQDN(dnsRecord.Spec.Domain, dnsRecord.Spec.Subdomain)
-		r.updateStatusWithError(ctx, dnsRecord, false, "SecretNotFound", fmt.Sprintf("Failed to get HMAC secret: %v", err), "SECRET_NOT_FOUND", err.Error(), fqdn)
+		r.updateStatusWithError(ctx, dnsRecord, "SecretNotFound", fmt.Sprintf("Failed to get HMAC secret: %v", err), "SECRET_NOT_FOUND", err.Error(), fqdn)
 		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 	}
 
@@ -147,22 +147,22 @@ func (r *DNSRecordReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "failed to upsert DNS record")
 		dnsErr, ok := err.(*dnsclient.Error)
 		if ok {
-			reason := "ServerError"
+			var reason string
 			switch dnsErr.Status {
 			case 400:
 				reason = "ValidationFailed"
 			case 401:
 				reason = "AuthenticationFailed"
 			case 500:
-				reason = "ServerError"
+				reason = serverErrorReason
 			default:
 				reason = "ServerUnreachable"
 			}
-			r.updateStatusWithError(ctx, dnsRecord, false, reason, fmt.Sprintf("Failed to upsert record: %s", dnsErr.Message), dnsErr.Code, dnsErr.Message, fqdn)
+			r.updateStatusWithError(ctx, dnsRecord, reason, fmt.Sprintf("Failed to upsert record: %s", dnsErr.Message), dnsErr.Code, dnsErr.Message, fqdn)
 			// Retry with exponential backoff
 			return r.calculateRetryResult(), nil
 		}
-		r.updateStatusWithError(ctx, dnsRecord, false, "ServerError", fmt.Sprintf("Failed to upsert record: %v", err), "SERVER_ERROR", err.Error(), fqdn)
+		r.updateStatusWithError(ctx, dnsRecord, serverErrorReason, fmt.Sprintf("Failed to upsert record: %v", err), "SERVER_ERROR", err.Error(), fqdn)
 		return r.calculateRetryResult(), nil
 	}
 
@@ -231,7 +231,7 @@ func (r *DNSRecordReconciler) handleDeletion(ctx context.Context, dnsRecord *dns
 }
 
 // upsertRecordWithRetry performs upsert with exponential backoff retry logic
-func (r *DNSRecordReconciler) upsertRecordWithRetry(ctx context.Context, client *dnsclient.Client, record dnsclient.RecordRequest) (*dnsclient.RecordResponse, error) {
+func (r *DNSRecordReconciler) upsertRecordWithRetry(ctx context.Context, dnsClient *dnsclient.Client, record dnsclient.RecordRequest) (*dnsclient.RecordResponse, error) {
 	baseDelay := DefaultRetryBaseDelay
 	maxDelay := DefaultRetryMaxDelay
 	maxAttempts := DefaultRetryMaxAttempts
@@ -254,7 +254,7 @@ func (r *DNSRecordReconciler) upsertRecordWithRetry(ctx context.Context, client 
 
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		recordResp, err := client.UpsertRecord(ctx, record)
+		recordResp, err := dnsClient.UpsertRecord(ctx, record)
 		if err == nil {
 			return recordResp, nil
 		}
@@ -355,16 +355,15 @@ func (r *DNSRecordReconciler) updateStatus(ctx context.Context, dnsRecord *dnsv1
 }
 
 // updateStatusWithError updates the DNSRecord status with error details
-func (r *DNSRecordReconciler) updateStatusWithError(ctx context.Context, dnsRecord *dnsv1alpha1.DNSRecord, ready bool, reason, message, errorCode, errorMessage, fqdn string) {
+func (r *DNSRecordReconciler) updateStatusWithError(ctx context.Context, dnsRecord *dnsv1alpha1.DNSRecord, reason, message, errorCode, errorMessage, fqdn string) {
 	now := metav1.Now()
 	error := &dnsv1alpha1.RecordError{
 		Code:      errorCode,
 		Message:   errorMessage,
 		Timestamp: &now,
 	}
-	r.updateStatus(ctx, dnsRecord, ready, reason, message, error, dnsv1alpha1.RecordStateError, fqdn)
+	r.updateStatus(ctx, dnsRecord, false, reason, message, error, dnsv1alpha1.RecordStateError, fqdn)
 }
-
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *DNSRecordReconciler) SetupWithManager(mgr ctrl.Manager) error {

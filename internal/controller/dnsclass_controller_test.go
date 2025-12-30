@@ -48,10 +48,11 @@ var _ = Describe("DNSClass Controller", func() {
 			if err != nil && errors.IsNotFound(err) {
 				resource := &dnsv1alpha1.DNSClass{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
+						Name: resourceName,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: dnsv1alpha1.DNSClassSpec{
+						Server: "http://test-server:7100",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

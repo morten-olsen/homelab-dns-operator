@@ -36,13 +36,17 @@ const (
 	HeaderNonce = "X-DNS-Nonce"
 	// HeaderSignature is the HTTP header for the HMAC signature
 	HeaderSignature = "X-DNS-Signature"
+	// serverErrorCode is the error code for server errors
+	serverErrorCode = "SERVER_ERROR"
+	// unknownErrorMessage is the default error message
+	unknownErrorMessage = "unknown error"
 )
 
 // Client is a DNS server webhook client
 type Client struct {
 	baseURL       string
 	httpClient    *http.Client
-	hmacSecret   []byte
+	hmacSecret    []byte
 	hmacAlgorithm hmac.Algorithm
 }
 
@@ -51,7 +55,7 @@ func NewClient(baseURL string, timeout time.Duration, hmacSecret []byte, hmacAlg
 	return &Client{
 		baseURL:       baseURL,
 		httpClient:    &http.Client{Timeout: timeout},
-		hmacSecret:   hmacSecret,
+		hmacSecret:    hmacSecret,
 		hmacAlgorithm: hmacAlgorithm,
 	}
 }
@@ -65,11 +69,11 @@ type HealthResponse struct {
 
 // RecordRequest represents a DNS record in a request
 type RecordRequest struct {
-	Type     string   `json:"type"`
-	Domain   string   `json:"domain"`
-	Subdomain string  `json:"subdomain"`
-	Values   []string `json:"values"`
-	TTL      *int32   `json:"ttl,omitempty"`
+	Type      string   `json:"type"`
+	Domain    string   `json:"domain"`
+	Subdomain string   `json:"subdomain"`
+	Values    []string `json:"values"`
+	TTL       *int32   `json:"ttl,omitempty"`
 }
 
 // UpsertRecordRequest represents an upsert record request
@@ -80,33 +84,33 @@ type UpsertRecordRequest struct {
 
 // RecordResponse represents a DNS record in a response
 type RecordResponse struct {
-	Type     string   `json:"type"`
-	Domain   string   `json:"domain"`
-	Subdomain string  `json:"subdomain"`
-	FQDN     string   `json:"fqdn"`
-	Values   []string `json:"values"`
-	TTL      *int32   `json:"ttl,omitempty"`
+	Type      string   `json:"type"`
+	Domain    string   `json:"domain"`
+	Subdomain string   `json:"subdomain"`
+	FQDN      string   `json:"fqdn"`
+	Values    []string `json:"values"`
+	TTL       *int32   `json:"ttl,omitempty"`
 }
 
 // UpsertRecordResponse represents an upsert record response
 type UpsertRecordResponse struct {
-	Success bool          `json:"success"`
+	Success bool            `json:"success"`
 	Record  *RecordResponse `json:"record,omitempty"`
-	Message string        `json:"message,omitempty"`
-	Error   *ErrorResponse `json:"error,omitempty"`
+	Message string          `json:"message,omitempty"`
+	Error   *ErrorResponse  `json:"error,omitempty"`
 }
 
 // GetRecordResponse represents a get record response
 type GetRecordResponse struct {
-	Success bool          `json:"success"`
+	Success bool            `json:"success"`
 	Record  *RecordResponse `json:"record,omitempty"`
-	Error   *ErrorResponse `json:"error,omitempty"`
+	Error   *ErrorResponse  `json:"error,omitempty"`
 }
 
 // DeleteRecordResponse represents a delete record response
 type DeleteRecordResponse struct {
-	Success bool          `json:"success"`
-	Message string        `json:"message,omitempty"`
+	Success bool           `json:"success"`
+	Message string         `json:"message,omitempty"`
 	Error   *ErrorResponse `json:"error,omitempty"`
 }
 
@@ -196,7 +200,9 @@ func (c *Client) CheckHealth(ctx context.Context) (*HealthResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -240,7 +246,9 @@ func (c *Client) UpsertRecord(ctx context.Context, record RecordRequest) (*Recor
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -253,8 +261,8 @@ func (c *Client) UpsertRecord(ctx context.Context, record RecordRequest) (*Recor
 	}
 
 	if !upsertResp.Success {
-		code := "SERVER_ERROR"
-		message := "unknown error"
+		code := serverErrorCode
+		message := unknownErrorMessage
 		if upsertResp.Error != nil {
 			code = upsertResp.Error.Code
 			message = upsertResp.Error.Message
@@ -289,7 +297,9 @@ func (c *Client) GetRecord(ctx context.Context, recordType, domain, subdomain st
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -305,8 +315,8 @@ func (c *Client) GetRecord(ctx context.Context, recordType, domain, subdomain st
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, nil // Record not found is not an error
 		}
-		code := "SERVER_ERROR"
-		message := "unknown error"
+		code := serverErrorCode
+		message := unknownErrorMessage
 		if getResp.Error != nil {
 			code = getResp.Error.Code
 			message = getResp.Error.Message
@@ -333,7 +343,9 @@ func (c *Client) DeleteRecord(ctx context.Context, recordType, domain, subdomain
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -350,8 +362,8 @@ func (c *Client) DeleteRecord(ctx context.Context, recordType, domain, subdomain
 		if resp.StatusCode == http.StatusNotFound {
 			return nil
 		}
-		code := "SERVER_ERROR"
-		message := "unknown error"
+		code := serverErrorCode
+		message := unknownErrorMessage
 		if deleteResp.Error != nil {
 			code = deleteResp.Error.Code
 			message = deleteResp.Error.Message

@@ -51,7 +51,15 @@ var _ = Describe("DNSRecord Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: dnsv1alpha1.DNSRecordSpec{
+						Type:      dnsv1alpha1.DNSRecordTypeA,
+						Domain:    "example.com",
+						Subdomain: "www",
+						DNSClassRef: dnsv1alpha1.DNSClassRef{
+							Name: "test-dnsclass",
+						},
+						Values: []string{"192.168.1.100"},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}

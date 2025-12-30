@@ -262,7 +262,7 @@ func isValidDomain(domain string) bool {
 		}
 		// Check for valid characters (letters, numbers, hyphens)
 		for _, r := range part {
-			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-') {
+			if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '-' {
 				return false
 			}
 		}
@@ -272,13 +272,22 @@ func isValidDomain(domain string) bool {
 
 // isValidSubdomain performs basic subdomain validation
 func isValidSubdomain(subdomain string) bool {
-	if subdomain == "" || len(subdomain) > 63 {
+	if subdomain == "" || len(subdomain) > 253 {
 		return false
 	}
-	// Check for valid characters (letters, numbers, hyphens)
-	for _, r := range subdomain {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-') {
+	// Check for valid characters (letters, numbers, hyphens, underscores, dots)
+	// Underscores and dots are allowed for SRV records (e.g., "_service._tcp")
+	// Split by dots and validate each part
+	parts := strings.Split(subdomain, ".")
+	for _, part := range parts {
+		if len(part) == 0 || len(part) > 63 {
 			return false
+		}
+		// Check each part for valid characters
+		for _, r := range part {
+			if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '-' && r != '_' {
+				return false
+			}
 		}
 	}
 	return true

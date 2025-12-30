@@ -39,6 +39,8 @@ const (
 	DefaultHealthCheckInterval = 10 * time.Minute
 	// EnvHealthCheckInterval is the environment variable for health check interval
 	EnvHealthCheckInterval = "DNS_CLASS_HEALTH_CHECK_INTERVAL"
+	// serverErrorReason is the reason for server errors
+	serverErrorReason = "ServerError"
 )
 
 // DNSClassReconciler reconciles a DNSClass object
@@ -98,11 +100,11 @@ func (r *DNSClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Perform health check
 	healthResp, err := dnsClient.CheckHealth(ctx)
 	now := metav1.Now()
-	healthStatus := dnsv1alpha1.HealthStatusUnknown
-	healthMessage := ""
-	ready := false
-	reason := "Unknown"
-	message := "Health check not completed"
+	var healthStatus dnsv1alpha1.HealthStatus
+	var healthMessage string
+	var ready bool
+	var reason string
+	var message string
 
 	if err != nil {
 		log.Error(err, "health check failed")
@@ -113,7 +115,7 @@ func (r *DNSClassReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			if dnsErr.Status == http.StatusServiceUnavailable {
 				reason = "ServerUnhealthy"
 			} else if dnsErr.Status >= 500 {
-				reason = "ServerError"
+				reason = serverErrorReason
 			}
 		}
 		message = fmt.Sprintf("Health check failed: %v", err)
