@@ -6,6 +6,10 @@ cliVersion: v4.10.1
 domain: homelab.mortenolsen.pro
 layout:
 - go.kubebuilder.io/v4
+plugins:
+  helm.kubebuilder.io/v2-alpha:
+    manifests: dist/install.yaml
+    output: dist
 projectName: dns-operator
 repo: github.com/mortenolsen/dns-operator
 resources:

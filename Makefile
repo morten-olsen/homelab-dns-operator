@@ -146,6 +146,12 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KUSTOMIZE)" build config/default > dist/install.yaml
 
+.PHONY: build-chart
+build-chart: manifests generate ## Generate Helm chart using kubebuilder helm plugin.
+	@echo "Generating Helm chart using kubebuilder..."
+	kubebuilder edit --plugins=helm/v2-alpha
+	@echo "Helm chart generated in dist/chart/"
+
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -161,6 +167,17 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -; else echo "No CRDs to delete; skipping."; fi
+
+.PHONY: update-crds
+update-crds: manifests ## Update CRDs in the Helm chart from the application (chart must be generated first with build-chart).
+	@echo "Updating CRDs in Helm chart..."
+	@if [ ! -d "dist/chart" ]; then \
+		echo "Error: Chart not found. Run 'make build-chart' first."; \
+		exit 1; \
+	fi
+	@mkdir -p dist/chart/templates/crd
+	@cp config/crd/bases/*.yaml dist/chart/templates/crd/ || true
+	@echo "CRDs updated in dist/chart/templates/crd/"
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
