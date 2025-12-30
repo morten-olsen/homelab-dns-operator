@@ -1,0 +1,92 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dns-homelab-mortenolsen-pro-v1alpha1-dnsclass
+  failurePolicy: Fail
+  name: mdnsclass-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - dns.homelab.mortenolsen.pro
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dnsclasses
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-dns-homelab-mortenolsen-pro-v1alpha1-dnsrecord
+  failurePolicy: Fail
+  name: mdnsrecord-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - dns.homelab.mortenolsen.pro
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dnsrecords
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dns-homelab-mortenolsen-pro-v1alpha1-dnsclass
+  failurePolicy: Fail
+  name: vdnsclass-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - dns.homelab.mortenolsen.pro
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dnsclasses
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-dns-homelab-mortenolsen-pro-v1alpha1-dnsrecord
+  failurePolicy: Fail
+  name: vdnsrecord-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - dns.homelab.mortenolsen.pro
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dnsrecords
+  sideEffects: None
