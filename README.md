@@ -43,6 +43,7 @@ The operator consists of two main custom resources:
 - kubectl version v1.11.3+
 - Access to a Kubernetes v1.11.3+ cluster
 - A DNS provider backend implementing the webhook protocol (see [DNS Server Webhook Protocol](#dns-server-webhook-protocol))
+  - For detailed implementation guide, see [DNS Provider Backend Implementation Guide](docs/dns-provider-backend-guide.md)
 
 ### Installation
 
@@ -336,6 +337,18 @@ DNS servers must:
 4. Reject requests with invalid signatures, stale timestamps, or reused nonces
 
 See the [specification document](spec/2025-12-30-dns-operator-spec.md) for detailed protocol documentation.
+
+### Building a DNS Provider Backend
+
+For a complete guide on implementing a DNS provider backend, including a full working example using the Cloudflare SDK, see the [DNS Provider Backend Implementation Guide](docs/dns-provider-backend-guide.md).
+
+The guide includes:
+- Complete protocol specification
+- Step-by-step implementation instructions
+- Full working example with Cloudflare SDK
+- HMAC authentication implementation
+- Testing and deployment instructions
+- Best practices and troubleshooting
 
 ## Configuration
 
