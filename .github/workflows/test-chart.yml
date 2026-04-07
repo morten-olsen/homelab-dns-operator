@@ -29,6 +29,17 @@ jobs:
       - name: Create kind cluster
         run: kind create cluster
 
+      - name: Install kubebuilder
+        run: |
+          curl -L -o kubebuilder https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)
+          chmod +x kubebuilder
+          sudo mv kubebuilder /usr/local/bin/
+
+      - name: Install kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
       - name: Prepare dns-operator
         run: |
           go mod tidy
@@ -41,6 +52,10 @@ jobs:
 
       - name: Verify Helm installation
         run: helm version
+
+      - name: Generate Helm chart
+        run: |
+          make build-chart
 
       - name: Lint Helm Chart
         run: |
