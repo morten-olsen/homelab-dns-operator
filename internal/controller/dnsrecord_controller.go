@@ -83,6 +83,14 @@ func (r *DNSRecordReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return r.handleDeletion(ctx, dnsRecord)
 	}
 
+	// Skip reconciliation if the spec hasn't changed (generation matches) and
+	// the record is already in a success state. This prevents a hot loop where
+	// the status update from a successful reconcile triggers another reconcile.
+	if dnsRecord.Status.ObservedGeneration == dnsRecord.Generation &&
+		(dnsRecord.Status.State == dnsv1alpha1.RecordStateCreated || dnsRecord.Status.State == dnsv1alpha1.RecordStateUpdated) {
+		return ctrl.Result{}, nil
+	}
+
 	// Add finalizer if not present
 	if !controllerutil.ContainsFinalizer(dnsRecord, FinalizerName) {
 		controllerutil.AddFinalizer(dnsRecord, FinalizerName)
