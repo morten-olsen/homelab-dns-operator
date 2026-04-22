@@ -224,7 +224,23 @@ func (r *DNSRecordReconciler) handleDeletion(ctx context.Context, dnsRecord *dns
 	err = dnsClient.DeleteRecord(ctx, string(dnsRecord.Spec.Type), dnsRecord.Spec.Domain, dnsRecord.Spec.Subdomain)
 	if err != nil {
 		log.Error(err, "failed to delete DNS record")
-		// Retry deletion
+
+		// On permanent failures (auth mismatch, not found), abandon cleanup
+		// and remove the finalizer. An orphaned DNS record is acceptable;
+		// a crash-looping operator is not.
+		if dnsErr, ok := err.(*dnsclient.Error); ok {
+			if dnsErr.Status == 401 || dnsErr.Status == 404 {
+				log.Info("permanent error during deletion, removing finalizer to unblock garbage collection",
+					"status", dnsErr.Status, "code", dnsErr.Code, "fqdn", r.buildFQDN(dnsRecord.Spec.Domain, dnsRecord.Spec.Subdomain))
+				controllerutil.RemoveFinalizer(dnsRecord, FinalizerName)
+				if updateErr := r.Update(ctx, dnsRecord); updateErr != nil {
+					return ctrl.Result{}, updateErr
+				}
+				return ctrl.Result{}, nil
+			}
+		}
+
+		// Transient errors (server down, timeout): retry with backoff
 		return r.calculateRetryResult(), nil
 	}
 
