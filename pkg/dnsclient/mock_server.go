@@ -282,10 +282,7 @@ func (m *MockDNSServer) validateHMAC(r *http.Request, path, body string) error {
 		path = r.URL.Path
 	}
 
-	components := []string{method, path, timestampStr, nonce}
-	if body != "" {
-		components = append(components, body)
-	}
+	components := []string{method, path, timestampStr, nonce, body}
 
 	expectedSig, err := hmac.CalculateHMAC(m.hmacSecret, m.algorithm, components...)
 	if err != nil {

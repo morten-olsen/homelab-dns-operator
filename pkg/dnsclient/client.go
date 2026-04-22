@@ -158,15 +158,18 @@ func (c *Client) prepareRequest(ctx context.Context, method, path string, body [
 		req.Header.Set(HeaderTimestamp, timestamp)
 		req.Header.Set(HeaderNonce, nonce)
 
-		// Calculate HMAC signature
+		// Calculate HMAC signature — always include body component
+		// (empty string for bodyless requests) to match server verification
+		bodyStr := ""
+		if body != nil {
+			bodyStr = string(body)
+		}
 		components := []string{
 			method,
 			path,
 			timestamp,
 			nonce,
-		}
-		if body != nil {
-			components = append(components, string(body))
+			bodyStr,
 		}
 
 		signature, err := hmac.CalculateHMAC(c.hmacSecret, c.hmacAlgorithm, components...)
