@@ -232,12 +232,12 @@ HMAC authentication provides request integrity verification and prevents replay 
 
 ### How It Works
 
-1. The operator calculates an HMAC signature over:
+1. The operator calculates an HMAC signature over these components (always all 5):
    - HTTP method (e.g., "POST", "DELETE")
    - Request path (e.g., "/records")
    - RFC3339 timestamp (e.g., "2025-12-30T10:00:00Z")
    - Nonce (unique random value per request)
-   - Request body (JSON payload, if present)
+   - Request body (JSON payload, or empty string for bodyless requests)
 
 2. Components are joined with newlines (`\n`) in order
 3. HMAC is calculated using SHA256 or SHA512
@@ -817,14 +817,13 @@ func (v *HMACVerifier) VerifyRequest(r *http.Request) error {
     r.Body = io.NopCloser(bytes.NewReader(body)) // Restore body for handler
 
     // Rebuild components for HMAC calculation
+    // Always include body (empty string for bodyless requests) to match operator signing
     components := []string{
         r.Method,
         r.URL.Path,
         timestamp,
         nonce,
-    }
-    if len(body) > 0 {
-        components = append(components, string(body))
+        string(body),
     }
 
     // Calculate expected HMAC
@@ -1361,6 +1360,7 @@ spec:
    - Check secret matches between operator and backend
    - Verify timestamp is within ±5 minutes
    - Ensure nonce is unique
+   - **Body component must always be included** in the signature, even for bodyless requests (GET, DELETE) — use empty string. Both operator and backend must agree on this.
 
 2. **Record Not Found**
    - Verify zone exists in Cloudflare
