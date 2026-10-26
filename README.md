@@ -12,6 +12,15 @@ The DNS Operator provides a generic DNS management system for Kubernetes cluster
 - Monitor DNS provider health and record status
 - Validate DNS record configurations before creation
 
+## Dependency updates
+
+Renovate runs through Woodpecker every Sunday at 03:30 UTC on `main`; the
+`manual` pipeline event supports an immediate run. `renovate.json` covers
+Dockerfile bases, Go dependencies, actions and other supported source files,
+including digest pinning for container images. Review dependency pull requests
+and publish the operator through its existing release workflow; core tracks the
+released Helm chart separately.
+
 ## Architecture
 
 The operator consists of two main custom resources:
