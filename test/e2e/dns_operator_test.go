@@ -28,6 +28,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,14 +38,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	dnsv1alpha1 "github.com/mortenolsen/dns-operator/api/v1alpha1"
-	"github.com/mortenolsen/dns-operator/pkg/dnsclient"
 	"github.com/mortenolsen/dns-operator/pkg/hmac"
 	"github.com/mortenolsen/dns-operator/test/utils"
 )
 
 var _ = Describe("DNS Operator E2E", func() {
 	var k8sClient client.Client
-	var mockServer *dnsclient.MockDNSServer
+	var mockServer *kindMockDNSServer
 	var ctx context.Context
 
 	BeforeEach(func() {
@@ -62,7 +62,7 @@ var _ = Describe("DNS Operator E2E", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		// Start mock DNS server
-		mockServer = dnsclient.NewMockDNSServer(nil, "")
+		mockServer = newKindMockDNSServer(nil, "")
 		DeferCleanup(func() {
 			mockServer.Close()
 		})
@@ -83,7 +83,7 @@ var _ = Describe("DNS Operator E2E", func() {
 			err := k8sClient.Create(ctx, dnsClass)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(func() {
-				k8sClient.Delete(ctx, dnsClass)
+				deleteDNSFixture(k8sClient, dnsClass)
 			})
 
 			By("waiting for DNSClass to be reconciled")
@@ -94,7 +94,7 @@ var _ = Describe("DNS Operator E2E", func() {
 					return false
 				}
 				// Check if health status is set
-				return updated.Status.Health != nil
+				return updated.Status.Health != nil && updated.Status.Health.Status == dnsv1alpha1.HealthStatusHealthy
 			}, 2*time.Minute, 5*time.Second).Should(BeTrue())
 
 			By("verifying DNSClass status")
@@ -108,7 +108,7 @@ var _ = Describe("DNS Operator E2E", func() {
 		It("should handle DNSClass with HMAC authentication", func() {
 			secret := []byte("e2e-test-secret")
 			mockServer.Close()
-			mockServer = dnsclient.NewMockDNSServer(secret, hmac.AlgorithmSHA256)
+			mockServer = newKindMockDNSServer(secret, hmac.AlgorithmSHA256)
 
 			// Create secret for HMAC auth
 			By("creating HMAC secret")
@@ -152,7 +152,7 @@ stringData:
 			err = k8sClient.Create(ctx, dnsClass)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(func() {
-				k8sClient.Delete(ctx, dnsClass)
+				deleteDNSFixture(k8sClient, dnsClass)
 			})
 
 			By("waiting for DNSClass to be reconciled")
@@ -183,14 +183,14 @@ stringData:
 			err := k8sClient.Create(ctx, dnsClass)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(func() {
-				k8sClient.Delete(ctx, dnsClass)
+				deleteDNSFixture(k8sClient, dnsClass)
 			})
 
 			// Wait for DNSClass to be ready
 			Eventually(func() bool {
 				updated := &dnsv1alpha1.DNSClass{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: "test-dnsclass-record-e2e"}, updated)
-				return err == nil && updated.Status.Health != nil
+				return err == nil && updated.Status.Health != nil && updated.Status.Health.Status == dnsv1alpha1.HealthStatusHealthy
 			}, 1*time.Minute, 2*time.Second).Should(BeTrue())
 		})
 
@@ -215,7 +215,7 @@ stringData:
 			err := k8sClient.Create(ctx, dnsRecord)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(func() {
-				k8sClient.Delete(ctx, dnsRecord)
+				deleteDNSFixture(k8sClient, dnsRecord)
 			})
 
 			By("waiting for DNSRecord to be reconciled")
@@ -268,6 +268,8 @@ stringData:
 			err := k8sClient.Create(ctx, dnsRecord)
 			Expect(err).NotTo(HaveOccurred())
 
+			DeferCleanup(func() { deleteDNSFixture(k8sClient, dnsRecord) })
+
 			By("waiting for DNSRecord to be created")
 			Eventually(func() bool {
 				return mockServer.GetRecord("A", "example.com", "delete") != nil
@@ -284,25 +286,36 @@ stringData:
 		})
 
 		It("should validate DNSRecord webhook", func() {
-			By("creating invalid DNSRecord (missing type)")
+			By("creating invalid DNSRecord (invalid IPv4 value)")
 			invalidRecord := &dnsv1alpha1.DNSRecord{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-record-invalid",
 					Namespace: namespace,
 				},
 				Spec: dnsv1alpha1.DNSRecordSpec{
+					Type:      dnsv1alpha1.DNSRecordTypeA,
 					Domain:    "example.com",
 					Subdomain: "www",
 					DNSClassRef: dnsv1alpha1.DNSClassRef{
 						Name: "test-dnsclass-record-e2e",
 					},
-					Values: []string{"192.168.1.100"},
+					Values: []string{"not-an-ip"},
 				},
 			}
 
 			err := k8sClient.Create(ctx, invalidRecord)
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("spec.type is required"))
+			Expect(err.Error()).To(ContainSubstring("spec.values[0] must be a valid IPv4 address"))
 		})
 	})
 })
+
+// Finish finalization while the per-spec mock and its DNSClass are still alive.
+func deleteDNSFixture(k8sClient client.Client, obj client.Object) {
+	ctx := context.Background()
+	err := k8sClient.Delete(ctx, obj)
+	ExpectWithOffset(1, client.IgnoreNotFound(err)).To(Succeed())
+	Eventually(func() bool {
+		return apierrors.IsNotFound(k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), obj))
+	}, time.Minute, time.Second).Should(BeTrue())
+}

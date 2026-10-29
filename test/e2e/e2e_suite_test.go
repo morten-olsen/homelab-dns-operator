@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -42,7 +44,10 @@ var (
 
 	// projectImage is the name of the image which will be build and loaded
 	// with the code source changes to be tested.
-	projectImage = "example.com/dns-operator:v0.0.1"
+	projectImage      = "example.com/dns-operator:v0.0.1"
+	controllerPodName string
+	kindGateway       string
+	suiteOwnsCluster  bool
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
@@ -56,9 +61,27 @@ func TestE2E(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	// Refuse to mutate a context other than the explicitly selected disposable Kind cluster.
+	cluster := os.Getenv("KIND_CLUSTER")
+	Expect(cluster).NotTo(BeEmpty(), "Use make test-e2e with an isolated Kind cluster")
+	suiteConfig, _ := GinkgoConfiguration()
+	Expect(suiteConfig.ParallelTotal).To(Equal(1), "This suite shares one Kind fixture; run seeds in separate clusters")
+	currentContext, err := utils.Run(exec.Command("kubectl", "config", "current-context"))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(strings.TrimSpace(currentContext)).To(Equal("kind-" + cluster))
+	suiteOwnsCluster = true
+
+	By("finding the runner address reachable from Kind pods")
+	gateway, err := utils.Run(exec.Command("docker", "network", "inspect", "kind",
+		"--format", "{{json .IPAM.Config}}"))
+	Expect(err).NotTo(HaveOccurred())
+	kindGateway, err = selectKindIPv4Gateway(gateway)
+	Expect(err).NotTo(HaveOccurred())
+	_, _ = fmt.Fprintf(GinkgoWriter, "Kind IPv4 mock gateway: %s\n", kindGateway)
+
 	By("building the manager(Operator) image")
 	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))
-	_, err := utils.Run(cmd)
+	_, err = utils.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "Failed to build the manager(Operator) image")
 
 	// TODO(user): If you want to change the e2e test vendor from Kind, ensure the image is
@@ -81,12 +104,83 @@ var _ = BeforeSuite(func() {
 			_, _ = fmt.Fprintf(GinkgoWriter, "WARNING: CertManager is already installed. Skipping installation...\n")
 		}
 	}
+
+	By("creating manager namespace with the restricted security policy")
+	runFixtureCommand("kubectl", "create", "ns", namespace)
+	runFixtureCommand("kubectl", "label", "--overwrite", "ns", namespace,
+		"pod-security.kubernetes.io/enforce=restricted")
+
+	By("installing and waiting for CRDs")
+	runFixtureCommand("make", "install")
+	runFixtureCommand("kubectl", "wait", "--for=condition=Established", "--timeout=2m",
+		"crd/dnsclasses.dns.homelab.mortenolsen.pro", "crd/dnsrecords.dns.homelab.mortenolsen.pro")
+
+	By("deploying and waiting for the controller-manager")
+	runFixtureCommand("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
+	runFixtureCommand("kubectl", "wait", "-n", namespace, "--for=condition=Ready", "--timeout=3m",
+		"certificate/dns-operator-serving-cert")
+	runFixtureCommand("kubectl", "rollout", "status", "deployment/dns-operator-controller-manager",
+		"-n", namespace, "--timeout=3m")
+	pod, err := utils.Run(exec.Command("kubectl", "get", "pods", "-n", namespace,
+		"-l", "control-plane=controller-manager", "-o", "jsonpath={.items[0].metadata.name}"))
+	Expect(err).NotTo(HaveOccurred())
+	controllerPodName = pod
+	Expect(controllerPodName).NotTo(BeEmpty())
+
+	By("waiting for admission through both DNS webhooks, including CA injection")
+	// A successful server dry-run exercises admission from the API server, beyond pod readiness.
+	Eventually(func(g Gomega) {
+		cmd := exec.Command("kubectl", "apply", "--dry-run=server", "-f", "-")
+		cmd.Stdin = strings.NewReader(fmt.Sprintf(`apiVersion: dns.homelab.mortenolsen.pro/v1alpha1
+kind: DNSClass
+metadata:
+  name: suite-readiness
+spec:
+  server: http://192.0.2.1
+---
+apiVersion: dns.homelab.mortenolsen.pro/v1alpha1
+kind: DNSRecord
+metadata:
+  name: suite-readiness
+  namespace: %s
+spec:
+  type: A
+  domain: example.com
+  subdomain: readiness
+  dnsClassRef:
+    name: suite-readiness
+  values: ["192.0.2.1"]
+`, namespace))
+		_, err := utils.Run(cmd)
+		g.Expect(err).NotTo(HaveOccurred())
+	}, 3*time.Minute, time.Second).Should(Succeed())
+
 })
 
 var _ = AfterSuite(func() {
+	if !suiteOwnsCluster {
+		return
+	}
+	// Keep the controller alive while DNSRecord finalizers remove mock records.
+	for _, args := range [][]string{
+		{"kubectl", "delete", "dnsrecords", "--all", "-A", "--ignore-not-found", "--timeout=60s"},
+		{"kubectl", "delete", "dnsclasses", "--all", "--ignore-not-found", "--timeout=60s"},
+		{"make", "undeploy", "ignore-not-found=true"},
+		{"make", "uninstall", "ignore-not-found=true"},
+		{"kubectl", "delete", "ns", namespace, "--ignore-not-found", "--timeout=60s"},
+	} {
+		_, err := utils.Run(exec.Command(args[0], args[1:]...))
+		Expect(err).NotTo(HaveOccurred())
+	}
+
 	// Teardown CertManager after the suite if not skipped and if it was not already installed
 	if !skipCertManagerInstall && !isCertManagerAlreadyInstalled {
 		_, _ = fmt.Fprintf(GinkgoWriter, "Uninstalling CertManager...\n")
 		utils.UninstallCertManager()
 	}
 })
+
+func runFixtureCommand(name string, args ...string) {
+	_, err := utils.Run(exec.Command(name, args...))
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+}
