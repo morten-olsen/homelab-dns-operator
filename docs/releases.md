@@ -49,7 +49,9 @@ verifier, rejects foreign/PR/failed/malformed event metadata, and proves the
 authoritative tag/SHA, ancestry and prior artifacts before passing validated
 outputs to the Pages job. It never executes event-supplied code with publishing
 permissions before that check, downloads no workflow artifacts and adds no
-credential, environment policy or token scope. The build cannot bypass a failed
+credential, environment policy or token scope. DNS Pages sets setup-go cache to
+false so the publishing job does not restore Go build/module caches. The build
+cannot bypass a failed
 gate on a tag event. Publications serialize;
 push one approved tag and wait before approving/pushing another. No new
 credential or permission is needed; source checks use public read endpoints.
