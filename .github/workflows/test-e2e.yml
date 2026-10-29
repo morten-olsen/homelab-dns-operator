@@ -6,7 +6,11 @@ on:
 
 jobs:
   test-e2e:
-    name: Run on Ubuntu
+    name: Kind seed ${{ matrix.seed }}
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1793298486, 1, 42]
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code
@@ -29,4 +33,4 @@ jobs:
       - name: Running Test e2e
         run: |
           go mod tidy
-          make test-e2e
+          make test-e2e E2E_SEED=${{ matrix.seed }}
