@@ -73,10 +73,11 @@ var _ = BeforeSuite(func() {
 
 	By("finding the runner address reachable from Kind pods")
 	gateway, err := utils.Run(exec.Command("docker", "network", "inspect", "kind",
-		"--format", "{{(index .IPAM.Config 0).Gateway}}"))
+		"--format", "{{json .IPAM.Config}}"))
 	Expect(err).NotTo(HaveOccurred())
-	kindGateway = strings.TrimSpace(gateway)
-	Expect(kindGateway).NotTo(BeEmpty())
+	kindGateway, err = selectKindIPv4Gateway(gateway)
+	Expect(err).NotTo(HaveOccurred())
+	_, _ = fmt.Fprintf(GinkgoWriter, "Kind IPv4 mock gateway: %s\n", kindGateway)
 
 	By("building the manager(Operator) image")
 	cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectImage))

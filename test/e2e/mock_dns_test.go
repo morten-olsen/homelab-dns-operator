@@ -26,7 +26,7 @@ func newKindMockDNSServer(secret []byte, algorithm hmac.Algorithm) *kindMockDNSS
 	mock := dnsclient.NewMockDNSServer(secret, algorithm)
 	target, err := url.Parse(mock.URL())
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	listener, err := net.Listen("tcp", net.JoinHostPort(kindGateway, "0"))
+	listener, err := net.Listen("tcp4", net.JoinHostPort(kindGateway, "0"))
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	proxy := httptest.NewUnstartedServer(httputil.NewSingleHostReverseProxy(target))
 	_ = proxy.Listener.Close()

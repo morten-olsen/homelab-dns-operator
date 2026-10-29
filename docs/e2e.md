@@ -18,7 +18,9 @@ finish deletion before their mock server shuts down.
 
 The existing `dnsclient.MockDNSServer` stays on runner loopback for unit tests.
 An E2E-only reverse proxy listens on an ephemeral port of the `kind` Docker
-network's gateway address, obtained with `docker network inspect kind`. Pods
+network's IPv4 gateway address, selected from `docker network inspect kind`
+IPAM entries (which can list IPv6 first). The default Kind pod network uses
+IPv4; choosing the first Docker gateway can advertise unreachable IPv6. Pods
 use that address, not their own loopback. It exposes only the test mock on the
 runner's Docker bridge; no runtime manifests, home network policies or operator
 code change. Linux bridge networking is required. Healthy DNSClass status and
