@@ -18,6 +18,11 @@ concurrency:
   group: operator-helm-publication
   cancel-in-progress: false
 
+# Used by image stamping as well as the release workflow; never rely on inherited env.
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   version:
     name: Verify Completed Forgejo Release

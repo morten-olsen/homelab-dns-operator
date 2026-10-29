@@ -60,7 +60,13 @@ Git URL. Mirror failures are repaired in Forgejo, never with downstream refs.
 A consumed version is refused even when its tag is missing. Existing images
 and release metadata block partial-publication retries. Each publisher repeats
 its source/version/artifact checks immediately before writing, including
-individual job retries. Lookup errors fail closed. All checkouts performing
+individual job retries. Lookup errors fail closed. Prior-stage image/release visibility is confirmed
+with up to six read-only lookups over 57 seconds when the response is 404;
+permission, rate-limit and transport errors fail immediately. Existing artifacts
+are refused without retry. This never retries an image/release/Pages publisher.
+Artifact lookups request cache revalidation. Install generation uses the existing
+Makefile-pinned Kustomize target instead of its anonymous latest-release API.
+All checkouts performing
 ancestry checks fetch full history. Image, release assets and Pages run in
 order; push one approved tag and wait for the complete publication.
 
@@ -96,3 +102,16 @@ It includes real temporary Git mirrors: downstream-only tags are pruned,
 source-owned tags survive, and hosted verification uses only the outward
 mirror while rejecting missing/wrong tags, unmerged commits and reused versions.
 Update this runbook in the same commit as workflow changes.
+
+## DNS 0.0.10 recovery boundary
+
+HOMEIT-434 published 0.0.10 at `5995cd1`. Its image, release metadata and
+release-attached chart are valid, but the separated Pages workflow omitted its
+image variables: that consumed Pages chart renders `/:0.0.10`. Do not deploy or
+silently overwrite it. The live workload remains 0.0.8. The corrected workflow
+sets the repository explicitly, and a regression executes both actual stamping
+scripts on the same chart fixture and requires identical usable values.
+A new exact version/commit publication needs Morten's approval; keep 0.0.10
+retained and supersede it with a new version. Its old chart-validation job also
+stopped at a rate-limited Kustomize download before generation. New checks use
+the existing pinned Makefile target, with no new credential or permission.
